@@ -1013,65 +1013,9 @@ function bulkHumanize() {
 }
 
 // ─── Stripe Checkout ──────────────────────────────────────
-async function startCheckout() {
-  const btn = document.getElementById('stripeBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Redirecting to Stripe...';
-
-  try {
-    // Use Stripe.js to create a checkout session
-    // NOTE: Replace STRIPE_PUBLISHABLE_KEY with your actual pk_live_ key
-    // The rk_live_ key is a RESTRICTED key — use it server-side or replace with pk_live_
-    const stripe = Stripe('pk_live_placeholder'); // ← Replace with your publishable key
-
-    // For a static site, you can also use Stripe Payment Links directly:
-    // const paymentLink = 'https://buy.stripe.com/your_payment_link';
-    // window.location.href = paymentLink;
-
-    // Or if you have a simple backend endpoint:
-    const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Bearer rk_live_placeholder',
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        'line_items[0][price_data][currency]': 'usd',
-        'line_items[0][price_data][product_data][name]': 'AI Text Humanizer Premium',
-        'line_items[0][price_data][unit_amount]': '900',
-        'line_items[0][quantity]': '1',
-        'mode': 'payment',
-        'success_url': window.location.href + '?premium=success',
-        'cancel_url': window.location.href + '?premium=cancelled',
-      }),
-    });
-
-    if (response.ok) {
-      const session = await response.json();
-      const result = await stripe.redirectToCheckout({ sessionId: session.id });
-      if (result.error) {
-        showToast('❌ Stripe error: ' + result.error.message);
-      }
-    } else {
-      // Fallback: use Payment Link approach
-      showToast('💡 Tip: Create a Stripe Payment Link at dashboard.stripe.com and use it here!');
-      // Simulate premium activation for demo
-      activatePremiumDemo();
-    }
-  } catch (e) {
-    console.error('Stripe error:', e);
-    showToast('💡 Set up your Stripe keys. For now, try the demo: activating premium...');
-    activatePremiumDemo();
-  }
-  btn.disabled = false;
-  btn.innerHTML = '🔓 Get Premium — $9';
-}
-
-function activatePremiumDemo() {
-  isPremium = true;
-  localStorage.setItem('th_premium', 'true');
-  updatePremiumUI();
-  showToast('🎉 Premium activated! Enjoy unlimited humanizations.');
+function startCheckout() {
+  // Redirect to Stripe Payment Link ($9 one-time)
+  window.open('https://buy.stripe.com/eVqeVf5Lh3Nygek2EH1oI0e', '_blank');
 }
 
 // ─── UI Helpers ───────────────────────────────────────────
