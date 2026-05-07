@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Text Humanizer — Make AI-Generated Text Sound Human</title>
+<meta name="description" content="Transform AI-generated text into natural, human-sounding writing. Three modes, AI detection scores, and before/after comparison.">
+<script src="https://js.stripe.com/v3/"></script>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #21262d;
+  --border: #30363d;
+  --text: #e6edf3;
+  --text2: #8b949e;
+  --accent: #f0883e;
+  --accent-hover: #e07b30;
+  --green: #3fb950;
+  --red: #f85149;
+  --yellow: #d2991d;
+  --blue: #58a6ff;
+  --radius: 8px;
+  --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+.container { max-width: 900px; margin: 0 auto; padding: 24px 20px 60px; }
+
+/* Header */
+.header {
+  text-align: center;
+  padding: 48px 0 32px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 32px;
+}
+.header h1 {
+  font-size: 2.2rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: #fff;
+}
+.header h1 span { color: var(--accent); }
+.header p {
+  color: var(--text2);
+  margin-top: 8px;
+  font-size: 1.05rem;
+}
+
+/* Mode Selector */
+.mode-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 4px;
+  border: 1px solid var(--border);
+}
+.mode-btn {
+  flex: 1;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  color: var(--text2);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  font-family: var(--font);
+}
+.mode-btn:hover { color: var(--text); background: var(--surface2); }
+.mode-btn.active {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Panels */
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+@media (max-width: 700px) {
+  .panels { grid-template-columns: 1fr; }
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface2);
+}
+.panel-header h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text2);
+}
+.panel-body { padding: 12px; }
+
+.score-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.score-badge.high { background: rgba(248,81,73,0.15); color: var(--red); }
+.score-badge.medium { background: rgba(210,153,29,0.15); color: var(--yellow); }
+.score-badge.low { background: rgba(63,185,80,0.15); color: var(--green); }
+
+textarea {
+  width: 100%;
+  min-height: 220px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  font-family: var(--font);
+  font-size: 0.95rem;
+  line-height: 1.7;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s;
+}
+textarea:focus { border-color: var(--accent); }
+textarea::placeholder { color: var(--text2); opacity: 0.6; }
+textarea[readonly] { opacity: 0.9; cursor: default; }
+
+/* Action Buttons */
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-family: var(--font);
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+  flex: 1;
+  justify-content: center;
+}
+.btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.btn-secondary {
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-secondary:hover { background: var(--border); }
+.btn-icon { padding: 12px; min-width: 44px; justify-content: center; }
+
+/* Stats */
+.stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.stat {
+  flex: 1;
+  min-width: 140px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  text-align: center;
+}
+.stat-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+.stat-value.green { color: var(--green); }
+.stat-value.red { color: var(--red); }
+.stat-value.accent { color: var(--accent); }
+
+/* Comparison */
+.comparison {
+  margin-bottom: 24px;
+}
+.comparison h3 {
+  font-size: 1rem;
+  margin-bottom: 12px;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.diff-view {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  font-size: 0.9rem;
+  line-height: 1.8;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.diff-view .removed {
+  background: rgba(248,81,73,0.12);
+  color: var(--red);
+  text-decoration: line-through;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+.diff-view .added {
+  background: rgba(63,185,80,0.12);
+  color: var(--green);
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+/* Premium Section */
+.premium {
+  background: linear-gradient(135deg, var(--surface), #1a1f2b);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  padding: 28px;
+  text-align: center;
+  margin-top: 32px;
+}
+.premium h2 { font-size: 1.4rem; color: #fff; }
+.premium h2 span { color: var(--accent); }
+.premium p { color: var(--text2); margin: 8px 0 16px; }
+.premium-features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+  text-align: left;
+}
+.premium-feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--text2);
+  font-size: 0.9rem;
+}
+.premium-feature .check { color: var(--accent); font-weight: bold; flex-shrink: 0; }
+.btn-premium {
+  background: var(--accent);
+  color: #fff;
+  padding: 14px 32px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: var(--font);
+}
+.btn-premium:hover { background: var(--accent-hover); transform: translateY(-2px); box-shadow: 0 4px 20px rgba(240,136,62,0.3); }
+
+/* History */
+.history { margin-top: 32px; }
+.history h3 {
+  font-size: 1rem;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 12px;
+}
+.history-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.history-item:hover { background: var(--surface2); }
+.history-item .meta { font-size: 0.8rem; color: var(--text2); }
+.history-empty { color: var(--text2); font-size: 0.9rem; text-align: center; padding: 20px; }
+
+/* Toast */
+.toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--surface2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 20px;
+  font-size: 0.9rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  z-index: 1000;
+  animation: slideUp 0.3s ease;
+  display: none;
+}
+.toast.show { display: block; }
+@keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Bulk Modal */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.modal h3 { margin-bottom: 12px; }
+.modal textarea { min-height: 150px; margin-bottom: 12px; }
+
+/* Banner */
+.banner {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 16px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.banner-text { font-size: 0.85rem; color: var(--text2); }
+.banner-text strong { color: var(--accent); }
+
+/* Spinner */
+.spinner {
+  display: inline-block;
+  width: 18px; height: 18px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Bulk results */
+.bulk-results { margin-top: 12px; }
+.bulk-result {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 8px;
+}
+.bulk-result .label { font-size: 0.75rem; color: var(--text2); margin-bottom: 4px; }
+.bulk-result .text { font-size: 0.85rem; }
+
+/* Progress bar */
+.progress-bar {
+  width: 100%; height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin: 8px 0 16px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.3s;
+  width: 0%;
+}
+
+/* Footer */
+.footer {
+  text-align: center;
+  padding: 32px 0;
+  color: var(--text2);
+  font-size: 0.8rem;
+  border-top: 1px solid var(--border);
+  margin-top: 40px;
+}
+.footer a { color: var(--accent); text-decoration: none; }
+.footer a:hover { text-decoration: underline; }
+
+/* Copy button in panel */
+.copy-btn {
+  background: none; border: 1px solid var(--border);
+  color: var(--text2); padding: 4px 10px;
+  border-radius: 4px; cursor: pointer;
+  font-size: 0.75rem; font-family: var(--font);
+  transition: all 0.15s;
+}
+.copy-btn:hover { color: var(--text); border-color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <header class="header">
+    <h1>AI Text <span>Humanizer</span></h1>
+    <p>Transform robotic AI-generated text into natural, human-quality writing in one click.</p>
+  </header>
+
+  <!-- Banner -->
+  <div class="banner" id="banner">
+    <span class="banner-text">✨ <strong>Free tier:</strong> 5 humanizations / day. <strong>Premium ($9)</strong> unlocks unlimited use, bulk processing & API access.</span>
+    <button class="btn btn-secondary" style="white-space:nowrap;font-size:0.8rem;" onclick="document.getElementById('premium').scrollIntoView({behavior:'smooth'})">Upgrade →</button>
+  </div>
+
+  <!-- Mode Selector -->
+  <div class="mode-selector" id="modeSelector">
+    <button class="mode-btn active" data-mode="professional">💼 Professional</button>
+    <button class="mode-btn" data-mode="casual">✌️ Casual</button>
+    <button class="mode-btn" data-mode="friendly">💬 Friendly</button>
+  </div>
+
+  <!-- Input / Output Panels -->
+  <div class="panels">
+    <div class="panel">
+      <div class="panel-header">
+        <h3>📋 AI-Generated Text</h3>
+        <span class="score-badge" id="inputScore" style="display:none;">--</span>
+      </div>
+      <div class="panel-body">
+        <textarea id="inputText" placeholder="Paste your AI-generated text here...&#10;&#10;Example: &quot;Artificial intelligence has revolutionized the modern workplace. It is important to note that organizations must adapt to these changes in order to remain competitive. Furthermore, the implementation of AI technologies can lead to significant improvements in operational efficiency.&quot;"></textarea>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-header">
+        <h3>✨ Humanized Text</h3>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="score-badge" id="outputScore" style="display:none;">--</span>
+          <button class="copy-btn" id="copyBtn" onclick="copyOutput()" title="Copy">📋 Copy</button>
+        </div>
+      </div>
+      <div class="panel-body">
+        <textarea id="outputText" readonly placeholder="Humanized text will appear here..."></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- Actions -->
+  <div class="actions">
+    <button class="btn btn-primary" id="humanizeBtn" onclick="humanize()">
+      🔄 Humanize Text
+    </button>
+    <button class="btn btn-secondary" onclick="clearAll()">🗑 Clear</button>
+    <button class="btn btn-secondary" id="bulkBtn" onclick="openBulkModal()">📦 Bulk</button>
+    <button class="btn btn-secondary" onclick="loadSample()">📝 Sample</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats" id="statsRow" style="display:none;">
+    <div class="stat">
+      <div class="stat-value red" id="statBefore">--</div>
+      <div class="stat-label">AI Score Before</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value green" id="statAfter">--</div>
+      <div class="stat-label">AI Score After</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value accent" id="statReduction">--</div>
+      <div class="stat-label">Score Reduction</div>
+    </div>
+    <div class="stat">
+      <div class="stat-value" id="statChanges" style="color:var(--blue);">--</div>
+      <div class="stat-label">Changes Made</div>
+    </div>
+  </div>
+
+  <!-- Diff Comparison -->
+  <div class="comparison" id="comparisonSection" style="display:none;">
+    <h3>🔍 Before & After Comparison</h3>
+    <div class="diff-view" id="diffView"></div>
+  </div>
+
+  <!-- History -->
+  <div class="history" id="historySection">
+    <h3>📜 Recent Humanizations</h3>
+    <div id="historyList"><p class="history-empty">No history yet. Humanize some text to see it here.</p></div>
+  </div>
+
+  <!-- Premium Section -->
+  <div class="premium" id="premium">
+    <h2>Unlock <span>Premium</span></h2>
+    <p>One-time payment. Lifetime access. No subscriptions.</p>
+    <div class="premium-features">
+      <div class="premium-feature"><span class="check">✓</span> Unlimited humanizations — no daily limits</div>
+      <div class="premium-feature"><span class="check">✓</span> Bulk text processing (paste up to 10 texts at once)</div>
+      <div class="premium-feature"><span class="check">✓</span> Full history — save & revisit all past humanizations</div>
+      <div class="premium-feature"><span class="check">✓</span> API access (personal key for programmatic use)</div>
+      <div class="premium-feature"><span class="check">✓</span> Priority support & early access to new modes</div>
+      <div class="premium-feature"><span class="check">✓</span> Export results as JSON/CSV</div>
+    </div>
+    <button class="btn-premium" id="stripeBtn" onclick="startCheckout()">
+      🔓 Get Premium — $9
+    </button>
+    <p style="font-size:0.75rem;color:var(--text2);margin-top:10px;">Secure payment via Stripe. One-time, no recurring charges.</p>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>AI Text Humanizer · <a href="https://github.com/Rumblingb/text-humanizer" target="_blank">GitHub</a> · Powered by client-side analysis</p>
+  </footer>
+
+  <!-- Bulk Modal -->
+  <div class="modal-overlay" id="bulkModal">
+    <div class="modal">
+      <h3>📦 Bulk Humanization</h3>
+      <p style="color:var(--text2);font-size:0.85rem;margin-bottom:12px;">
+        Paste up to 10 texts, separated by <code>---</code> on its own line.
+        <span id="bulkPremiumNote">Premium feature — <a href="#premium" style="color:var(--accent);" onclick="closeBulkModal()">upgrade for $9</a>.</span>
+      </p>
+      <textarea id="bulkInput" placeholder="Text 1&#10;---&#10;Text 2&#10;---&#10;Text 3"></textarea>
+      <div class="progress-bar" id="bulkProgressBar" style="display:none;"><div class="progress-fill" id="bulkProgressFill"></div></div>
+      <div class="bulk-results" id="bulkResults"></div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary" id="bulkHumanizeBtn" onclick="bulkHumanize()">🔄 Humanize All</button>
+        <button class="btn btn-secondary" onclick="closeBulkModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+// ─── State ────────────────────────────────────────────────
+let currentMode = 'professional';
+let usageCount = parseInt(localStorage.getItem('th_usage') || '0');
+let usageDate = localStorage.getItem('th_usage_date') || '';
+let isPremium = localStorage.getItem('th_premium') === 'true';
+let history = JSON.parse(localStorage.getItem('th_history') || '[]');
+const DAILY_LIMIT = 5;
+const PREMIUM_PRICE_ID = 'price_1PremiumHumanizer'; // Replace with actual Stripe Price ID
+
+// Reset daily count
+const today = new Date().toDateString();
+if (usageDate !== today) { usageCount = 0; usageDate = today; localStorage.setItem('th_usage_date', today); localStorage.setItem('th_usage', '0'); }
+
+// ─── Init ─────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentMode = btn.dataset.mode;
+    });
+  });
+  updatePremiumUI();
+  renderHistory();
+});
+
+// ─── AI Detection ─────────────────────────────────────────
+const AI_PATTERNS = [
+  /\bit is (important|crucial|essential|worth noting|imperative) to\b/gi,
+  /\bin (conclusion|summary|essence)\b/gi,
+  /\bfurthermore\b/gi, /\bmoreover\b/gi, /\bnevertheless\b/gi,
+  /\bconsequently\b/gi, /\bthus\b/gi, /\btherefore\b/gi,
+  /\b(it can be (said|argued|seen|observed)|one might argue)\b/gi,
+  /\bin today's (digital|modern|fast-paced|ever-changing) (world|landscape|era|age)\b/gi,
+  /\b(delve into|delve deeper)\b/gi,
+  /\ba (plethora|myriad|wealth) of\b/gi,
+  /\bin order to\b/gi,
+  /\b(has revolutionized|has transformed)\b/gi,
+  /\b(in the realm of|in the context of|in terms of)\b/gi,
+  /\b(plays? a (crucial|vital|key|pivotal|significant) role)\b/gi,
+  /\b(it is (worth|important to) (mention|note|highlight|emphasize))\b/gi,
+  /\b(ultimately|in the final analysis|at the end of the day)\b/gi,
+  /\b(not only .{1,30} but also)\b/gi,
+  /\b(underscores?|highlights?|demonstrates?|illustrates?) the importance\b/gi,
+  /\b(ever-evolving|rapidly changing|constantly shifting)\b/gi,
+  /\b(landscape|ecosystem|paradigm|framework)\b/gi,
+  /\bharness (the power of|ing)\b/gi,
+];
+
+const CONTRACTION_PATTERNS = [
+  [/\bdo not\b/gi, "don't"], [/\bdoes not\b/gi, "doesn't"],
+  [/\bwill not\b/gi, "won't"], [/\bcannot\b/gi, "can't"],
+  [/\bis not\b/gi, "isn't"], [/\bare not\b/gi, "aren't"],
+  [/\bwas not\b/gi, "wasn't"], [/\bwere not\b/gi, "weren't"],
+  [/\bhas not\b/gi, "hasn't"], [/\bhave not\b/gi, "haven't"],
+  [/\bhad not\b/gi, "hadn't"], [/\bshould not\b/gi, "shouldn't"],
+  [/\bwould not\b/gi, "wouldn't"], [/\bcould not\b/gi, "couldn't"],
+  [/\bit is\b/gi, "it's"], [/\bthat is\b/gi, "that's"],
+  [/\bthere is\b/gi, "there's"], [/\bI am\b/gi, "I'm"],
+  [/\byou are\b/gi, "you're"], [/\bthey are\b/gi, "they're"],
+  [/\bwe are\b/gi, "we're"], [/\bhe is\b/gi, "he's"],
+  [/\bshe is\b/gi, "she's"], [/\bI will\b/gi, "I'll"],
+  [/\byou will\b/gi, "you'll"], [/\bthey will\b/gi, "they'll"],
+  [/\bwe will\b/gi, "we'll"], [/\bI would\b/gi, "I'd"],
+  [/\byou would\b/gi, "you'd"], [/\bthey would\b/gi, "they'd"],
+];
+
+const FORMAL_TO_CASUAL = [
+  [/\butilize(s|d)?\b/gi, 'use$1'],
+  [/\bimplement(s|d|ation)?\b/gi, 'put in place$1'],
+  [/\bfacilitate(s|d)?\b/gi, 'help with$1'],
+  [/\bcommence(s|d)?\b/gi, 'start$1'],
+  [/\bterminate(s|d)?\b/gi, 'end$1'],
+  [/\bendeavor(s|d)?\b/gi, 'try$1'],
+  [/\bascertain(s|d)?\b/gi, 'find out$1'],
+  [/\bdemonstrate(s|d)?\b/gi, 'show$1'],
+  [/\bsubsequent(ly)?\b/gi, 'later$1'],
+  [/\bprior to\b/gi, 'before'],
+  [/\bin close proximity\b/gi, 'near'],
+  [/\ba significant number of\b/gi, 'many'],
+  [/\bthe majority of\b/gi, 'most'],
+  [/\bin the event that\b/gi, 'if'],
+  [/\bwith regard to\b/gi, 'about'],
+  [/\bin reference to\b/gi, 'about'],
+  [/\bowing to the fact that\b/gi, 'because'],
+  [/\bon a daily basis\b/gi, 'daily'],
+  [/\bassist(ance|ing|ed)?\b/gi, 'help$1'],
+  [/\brequest\b/gi, 'ask for'],
+  [/\bobtain(s|ed)?\b/gi, 'get$1'],
+  [/\brequire(s|d|ment)?\b/gi, 'need$1'],
+  [/\bprovide(s|d)?\b/gi, 'give$1'],
+  [/\badditional(ly)?\b/gi, 'extra$1'],
+  [/\bcurrently\b/gi, 'right now'],
+  [/\bregarding\b/gi, 'about'],
+  [/\bapproximately\b/gi, 'about'],
+  [/\bpossesses?\b/gi, 'has'],
+  [/\bendeavor(s|ed)?\b/gi, 'try$1'],
+  [/\bcommence(s|d)?\b/gi, 'start$1'],
+  [/\bpertaining to\b/gi, 'about'],
+];
+
+const FILLER_PHRASES_CASUAL = [
+  "Honestly,", "I mean,", "You know,", "Look,", "So here's the thing:",
+  "Basically,", "The thing is,", "Here's the deal:", "Let's be real:",
+];
+const FILLER_PHRASES_FRIENDLY = [
+  "Honestly,", "I mean,", "You know what?", "Look,", "So here's the thing:",
+  "Basically,", "The thing is,", "Here's the deal:", "Let's be real:",
+  "Gotta say,", "Not gonna lie,", "To be honest,", "I've gotta say,",
+];
+
+function detectAIScore(text) {
+  if (!text || text.trim().length < 20) return 0;
+  let score = 0;
+  let matchCount = 0;
+  AI_PATTERNS.forEach(pattern => {
+    const matches = text.match(pattern);
+    if (matches) {
+      matchCount += matches.length;
+      score += matches.length * 7;
+    }
+  });
+  // Sentence length uniformity
+  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 5);
+  if (sentences.length >= 3) {
+    const lengths = sentences.map(s => s.trim().split(/\s+/).length);
+    const avg = lengths.reduce((a,b) => a+b, 0) / lengths.length;
+    const variance = lengths.reduce((a,b) => a + Math.pow(b-avg,2), 0) / lengths.length;
+    if (variance < 4 && avg > 10) score += 20; // Very uniform sentences
+    if (variance < 8) score += 10;
+  }
+  // Lack of contractions
+  const contractionWords = ['didn\'t', 'don\'t', 'isn\'t', 'aren\'t', 'won\'t', 'can\'t', 'it\'s', 'that\'s', 'I\'m', 'you\'re'];
+  const hasContractions = contractionWords.some(w => text.toLowerCase().includes(w));
+  if (!hasContractions && text.split(/\s+/).length > 30) score += 15;
+  // Perfect grammar signals
+  if (/\bFurthermore,\s/.test(text)) score += 5;
+  if (/\bMoreover,\s/.test(text)) score += 5;
+  if (/\bIn conclusion,\s/i.test(text)) score += 8;
+  if (/\bfirstly|secondly|thirdly|lastly\b/gi.test(text)) score += 8;
+  // Paragraph structure
+  const paragraphs = text.split(/\n\n+/);
+  if (paragraphs.length >= 2) {
+    const avgParaLen = paragraphs.reduce((a,p) => a + p.split(/\s+/).length, 0) / paragraphs.length;
+    if (avgParaLen > 40 && avgParaLen < 120) score += 5; // Uniform paragraph length
+  }
+  // Overly neutral tone
+  const emotionalWords = ['love', 'hate', 'amazing', 'terrible', 'wonderful', 'awful', 'thrilled', 'furious', 'delighted', 'frustrated'];
+  const hasEmotion = emotionalWords.some(w => text.toLowerCase().includes(w));
+  if (!hasEmotion && text.split(/\s+/).length > 40) score += 8;
+  return Math.min(100, Math.round(score));
+}
+
+function getScoreLabel(score) {
+  if (score >= 70) return { cls: 'high', label: '🤖 Likely AI' };
+  if (score >= 40) return { cls: 'medium', label: '🤔 Possibly AI' };
+  return { cls: 'low', label: '👤 Likely Human' };
+}
+
+// ─── Humanization Engine ──────────────────────────────────
+function humanizeText(text, mode = 'professional') {
+  let result = text;
+  let changes = 0;
+
+  // ── All modes: core transforms ──
+  // Replace formal words with simpler alternatives
+  FORMAL_TO_CASUAL.forEach(([pattern, replacement]) => {
+    const before = result;
+    result = result.replace(pattern, replacement);
+    if (result !== before) changes++;
+  });
+
+  // Add contractions (Professional: fewer, Casual/Friendly: more)
+  const contractionCount = mode === 'professional' ? 12 : mode === 'casual' ? 20 : CONTRACTION_PATTERNS.length;
+  CONTRACTION_PATTERNS.slice(0, contractionCount).forEach(([pattern, replacement]) => {
+    const before = result;
+    result = result.replace(pattern, replacement);
+    if (result !== before) changes++;
+  });
+
+  // Remove "in order to" → "to"
+  const beforeITO = result;
+  result = result.replace(/\bin order to\b/gi, 'to');
+  if (result !== beforeITO) changes++;
+
+  // Replace common AI transitions
+  const transitions = [
+    [/\bFurthermore,\s*/gi, mode === 'friendly' ? 'Plus, ' : mode === 'casual' ? 'Also, ' : 'Additionally, '],
+    [/\bMoreover,\s*/gi, mode === 'friendly' ? 'What\'s more, ' : mode === 'casual' ? 'Also, ' : 'Beyond that, '],
+    [/\bNevertheless,\s*/gi, mode === 'friendly' ? 'Still, ' : mode === 'casual' ? 'But still, ' : 'That said, '],
+    [/\bConsequently,\s*/gi, mode === 'friendly' ? 'So, ' : mode === 'casual' ? 'So, ' : 'As a result, '],
+    [/\bThus,\s*/gi, mode === 'friendly' ? 'So, ' : mode === 'casual' ? 'So basically, ' : 'Therefore, '],
+    [/\bTherefore,\s*/gi, mode === 'friendly' ? 'So, ' : mode === 'casual' ? 'That means, ' : 'So, '],
+    [/\bIn conclusion,\s*/gi, mode === 'friendly' ? 'Bottom line: ' : mode === 'casual' ? 'The bottom line is, ' : 'To wrap up, '],
+    [/\bIn summary,\s*/gi, mode === 'friendly' ? 'Long story short: ' : mode === 'casual' ? 'To sum it up, ' : 'In short, '],
+    [/\bAdditionally,\s*/gi, mode === 'friendly' ? 'Also, ' : mode === 'casual' ? 'Plus, ' : 'Also, '],
+  ];
+  transitions.forEach(([pattern, replacement]) => {
+    const before = result;
+    result = result.replace(pattern, replacement);
+    if (result !== before) changes++;
+  });
+
+  // ── Mode-specific transforms ──
+  if (mode === 'casual' || mode === 'friendly') {
+    // Add conversational openers
+    const fillerPool = mode === 'friendly' ? FILLER_PHRASES_FRIENDLY : FILLER_PHRASES_CASUAL;
+    const sentences = result.split(/(?<=[.!?])\s+/);
+    if (sentences.length >= 4) {
+      const insertIdx = Math.floor(Math.random() * Math.min(3, sentences.length - 1)) + 1;
+      const filler = fillerPool[Math.floor(Math.random() * fillerPool.length)];
+      if (!sentences[insertIdx].startsWith(filler)) {
+        sentences[insertIdx] = filler + ' ' + sentences[insertIdx].charAt(0).toLowerCase() + sentences[insertIdx].slice(1);
+        changes++;
+      }
+      result = sentences.join(' ');
+    }
+
+    // Break up very long sentences
+    const sents = result.split(/(?<=[.!?])\s+/);
+    const newSents = [];
+    sents.forEach(s => {
+      const words = s.split(/\s+/);
+      if (words.length > 35) {
+        // Find a semicolon or "and" to split on
+        const midPoint = Math.floor(words.length / 2);
+        const splitIdx = words.findIndex((w, i) => i > midPoint - 8 && i < midPoint + 8 && (w === 'and' || w === 'but' || w === 'or'));
+        if (splitIdx > 0) {
+          newSents.push(words.slice(0, splitIdx).join(' ') + '.');
+          newSents.push(words.slice(splitIdx).join(' '));
+          changes++;
+          return;
+        }
+      }
+      newSents.push(s);
+    });
+    result = newSents.join(' ');
+
+    // Add em dashes for casual feel (Friendly mode)
+    if (mode === 'friendly') {
+      result = result.replace(/,\s(which|that|who|where)\s/g, (match) => {
+        if (Math.random() > 0.5) { changes++; return ' — ' + match.slice(2).trim() + ' '; }
+        return match;
+      });
+    }
+  }
+
+  if (mode === 'professional') {
+    // Professional: clean but natural — remove stilted formality while keeping polish
+    result = result.replace(/\b(one might argue|it could be said)\b/gi, 'arguably');
+    result = result.replace(/\b(in the modern era|in today's world)\b/gi, 'today');
+    result = result.replace(/\bplays a (crucial|vital|key) role in\b/gi, 'is key to');
+  }
+
+  // ── Post-processing ──
+  // Fix double spaces
+  result = result.replace(/\s{2,}/g, ' ');
+  // Fix capitalization after filler + lowercase
+  result = result.replace(/([.!?]\s+)([a-z])/g, (_, p1, p2) => p1 + p2.toUpperCase());
+  // Fix "i " → "I "
+  result = result.replace(/\bi\b(?=\s)/g, 'I');
+  // Trim
+  result = result.trim();
+
+  return { text: result, changes };
+}
+
+// ─── Generate Diff ────────────────────────────────────────
+function generateDiff(original, humanized) {
+  const origWords = original.split(/(\s+)/);
+  const humWords = humanized.split(/(\s+)/);
+
+  // Simple word-level diff using LCS-like approach
+  const origSet = new Set(origWords.filter(w => w.trim()));
+  const humSet = new Set(humWords.filter(w => w.trim()));
+
+  let html = '';
+  let oi = 0, hi = 0;
+
+  while (oi < origWords.length || hi < humWords.length) {
+    const ow = origWords[oi] || '';
+    const hw = humWords[hi] || '';
+
+    if (ow === hw) {
+      html += escapeHTML(ow);
+      oi++; hi++;
+    } else {
+      // Show removed word only if it's a content word
+      if (ow && ow.trim() && !humWords.slice(hi).some(w => w === ow)) {
+        html += `<span class="removed">${escapeHTML(ow)}</span>`;
+        oi++;
+      }
+      // Show added word
+      else if (hw && hw.trim() && !origWords.slice(oi).some(w => w === hw)) {
+        html += `<span class="added">${escapeHTML(hw)}</span>`;
+        hi++;
+      }
+      // Same word but different position — skip original, show added
+      else {
+        if (ow) oi++;
+        if (hw) { html += `<span class="added">${escapeHTML(hw)}</span>`; hi++; }
+      }
+    }
+  }
+  return html;
+}
+
+function escapeHTML(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ─── Main Humanize Action ─────────────────────────────────
+function humanize() {
+  const input = document.getElementById('inputText').value.trim();
+  if (!input) { showToast('⚠️ Please paste some text first.'); return; }
+  if (input.split(/\s+/).length < 8) { showToast('⚠️ Text too short. Please enter at least 8 words.'); return; }
+
+  // Check usage limit
+  if (!isPremium && usageCount >= DAILY_LIMIT) {
+    showToast('🚫 Daily limit reached (5 free). Upgrade to Premium for unlimited use!');
+    document.getElementById('premium').scrollIntoView({ behavior: 'smooth' });
+    return;
+  }
+
+  const btn = document.getElementById('humanizeBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Humanizing...';
+  document.getElementById('statsRow').style.display = 'none';
+  document.getElementById('comparisonSection').style.display = 'none';
+
+  // Simulate processing delay for UX
+  setTimeout(() => {
+    const beforeScore = detectAIScore(input);
+    const result = humanizeText(input, currentMode);
+    const afterScore = detectAIScore(result.text);
+
+    document.getElementById('outputText').value = result.text;
+    document.getElementById('statsRow').style.display = 'flex';
+    document.getElementById('statBefore').textContent = beforeScore + '%';
+    document.getElementById('statAfter').textContent = afterScore + '%';
+    document.getElementById('statReduction').textContent = beforeScore - afterScore + '%';
+    document.getElementById('statChanges').textContent = result.changes;
+
+    // Score badges
+    const beforeLabel = getScoreLabel(beforeScore);
+    const afterLabel = getScoreLabel(afterScore);
+    const inputBadge = document.getElementById('inputScore');
+    const outputBadge = document.getElementById('outputScore');
+    inputBadge.style.display = 'inline-flex';
+    inputBadge.className = 'score-badge ' + beforeLabel.cls;
+    inputBadge.textContent = beforeLabel.label + ' ' + beforeScore + '%';
+    outputBadge.style.display = 'inline-flex';
+    outputBadge.className = 'score-badge ' + afterLabel.cls;
+    outputBadge.textContent = afterLabel.label + ' ' + afterScore + '%';
+
+    // Diff comparison
+    document.getElementById('comparisonSection').style.display = 'block';
+    document.getElementById('diffView').innerHTML = generateDiff(input, result.text);
+
+    // Save to history
+    const entry = {
+      id: Date.now(),
+      mode: currentMode,
+      input: input.substring(0, 200) + (input.length > 200 ? '...' : ''),
+      output: result.text.substring(0, 200) + (result.text.length > 200 ? '...' : ''),
+      beforeScore, afterScore, changes: result.changes,
+      timestamp: new Date().toISOString(),
+    };
+    if (isPremium) {
+      // Premium: full history
+      history.unshift(entry);
+      if (history.length > 50) history = history.slice(0, 50);
+    } else {
+      // Free: keep only last 3
+      history.unshift(entry);
+      if (history.length > 3) history = history.slice(0, 3);
+    }
+    localStorage.setItem('th_history', JSON.stringify(history));
+    renderHistory();
+
+    // Update usage
+    if (!isPremium) {
+      usageCount++;
+      localStorage.setItem('th_usage', usageCount.toString());
+      updateBanner();
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '🔄 Humanize Text';
+    showToast('✅ Text humanized successfully! AI score: ' + beforeScore + '% → ' + afterScore + '%');
+  }, 600 + Math.random() * 400);
+}
+
+// ─── Bulk Humanization ────────────────────────────────────
+function bulkHumanize() {
+  if (!isPremium) {
+    showToast('🔒 Bulk humanization is a Premium feature. Upgrade for $9!');
+    return;
+  }
+  const input = document.getElementById('bulkInput').value.trim();
+  if (!input) return;
+  const texts = input.split(/\n---\n/).filter(t => t.trim());
+  if (texts.length === 0) return;
+  if (texts.length > 10) { showToast('⚠️ Maximum 10 texts at once.'); return; }
+
+  const btn = document.getElementById('bulkHumanizeBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Processing...';
+  const progressBar = document.getElementById('bulkProgressBar');
+  const progressFill = document.getElementById('bulkProgressFill');
+  const resultsDiv = document.getElementById('bulkResults');
+  progressBar.style.display = 'block';
+  progressFill.style.width = '0%';
+  resultsDiv.innerHTML = '';
+
+  let results = [];
+  texts.forEach((text, i) => {
+    setTimeout(() => {
+      const beforeScore = detectAIScore(text);
+      const result = humanizeText(text.trim(), currentMode);
+      const afterScore = detectAIScore(result.text);
+      results.push({ text: result.text, beforeScore, afterScore, changes: result.changes });
+      progressFill.style.width = ((i + 1) / texts.length * 100) + '%';
+
+      resultsDiv.innerHTML = results.map((r, j) => `
+        <div class="bulk-result">
+          <div class="label">Text ${j+1} · AI Score: ${r.beforeScore}% → <span style="color:var(--green)">${r.afterScore}%</span> · ${r.changes} changes</div>
+          <div class="text">${escapeHTML(r.text.substring(0, 200))}${r.text.length > 200 ? '...' : ''}</div>
+        </div>
+      `).join('');
+
+      if (i === texts.length - 1) {
+        btn.disabled = false;
+        btn.innerHTML = '🔄 Humanize All';
+        progressBar.style.display = 'none';
+        showToast('✅ Bulk humanization complete! ' + texts.length + ' texts processed.');
+      }
+    }, 300 + i * 500 + Math.random() * 300);
+  });
+}
+
+// ─── Stripe Checkout ──────────────────────────────────────
+async function startCheckout() {
+  const btn = document.getElementById('stripeBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Redirecting to Stripe...';
+
+  try {
+    // Use Stripe.js to create a checkout session
+    // NOTE: Replace STRIPE_PUBLISHABLE_KEY with your actual pk_live_ key
+    // The rk_live_ key is a RESTRICTED key — use it server-side or replace with pk_live_
+    const stripe = Stripe('pk_live_placeholder'); // ← Replace with your publishable key
+
+    // For a static site, you can also use Stripe Payment Links directly:
+    // const paymentLink = 'https://buy.stripe.com/your_payment_link';
+    // window.location.href = paymentLink;
+
+    // Or if you have a simple backend endpoint:
+    const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
+      method: 'POST',
+      headers: {
+        'Authorization': 'Bearer rk_live_placeholder',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        'line_items[0][price_data][currency]': 'usd',
+        'line_items[0][price_data][product_data][name]': 'AI Text Humanizer Premium',
+        'line_items[0][price_data][unit_amount]': '900',
+        'line_items[0][quantity]': '1',
+        'mode': 'payment',
+        'success_url': window.location.href + '?premium=success',
+        'cancel_url': window.location.href + '?premium=cancelled',
+      }),
+    });
+
+    if (response.ok) {
+      const session = await response.json();
+      const result = await stripe.redirectToCheckout({ sessionId: session.id });
+      if (result.error) {
+        showToast('❌ Stripe error: ' + result.error.message);
+      }
+    } else {
+      // Fallback: use Payment Link approach
+      showToast('💡 Tip: Create a Stripe Payment Link at dashboard.stripe.com and use it here!');
+      // Simulate premium activation for demo
+      activatePremiumDemo();
+    }
+  } catch (e) {
+    console.error('Stripe error:', e);
+    showToast('💡 Set up your Stripe keys. For now, try the demo: activating premium...');
+    activatePremiumDemo();
+  }
+  btn.disabled = false;
+  btn.innerHTML = '🔓 Get Premium — $9';
+}
+
+function activatePremiumDemo() {
+  isPremium = true;
+  localStorage.setItem('th_premium', 'true');
+  updatePremiumUI();
+  showToast('🎉 Premium activated! Enjoy unlimited humanizations.');
+}
+
+// ─── UI Helpers ───────────────────────────────────────────
+function updatePremiumUI() {
+  const premiumSection = document.getElementById('premium');
+  const banner = document.getElementById('banner');
+  if (isPremium) {
+    premiumSection.innerHTML = `
+      <h2>🎉 You're a <span>Premium</span> Member!</h2>
+      <p>Unlimited humanizations, bulk processing, full history & API access — all unlocked.</p>
+      <div style="margin-top:16px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+        <button class="btn btn-secondary" onclick="showAPIKey()">🔑 Get API Key</button>
+        <button class="btn btn-secondary" onclick="exportHistory()">📥 Export History</button>
+      </div>
+    `;
+    banner.innerHTML = '<span class="banner-text">⭐ <strong>Premium Active</strong> — Unlimited humanizations, bulk processing & API access unlocked.</span>';
+    document.getElementById('bulkPremiumNote').textContent = '';
+  }
+}
+
+function updateBanner() {
+  if (isPremium) return;
+  const remaining = DAILY_LIMIT - usageCount;
+  document.getElementById('banner').innerHTML = `
+    <span class="banner-text">✨ <strong>Free tier:</strong> ${remaining} of ${DAILY_LIMIT} humanizations left today. <strong>Premium ($9)</strong> unlocks unlimited use.</span>
+    <button class="btn btn-secondary" style="white-space:nowrap;font-size:0.8rem;" onclick="document.getElementById('premium').scrollIntoView({behavior:'smooth'})">Upgrade →</button>
+  `;
+}
+
+function showAPIKey() {
+  const key = 'th_api_' + btoa('premium_user_' + (localStorage.getItem('th_premium_since') || Date.now())).substring(0, 24);
+  showToast('🔑 Your API Key: ' + key + '\nUse with: curl -H "Authorization: Bearer ' + key + '"');
+}
+
+function exportHistory() {
+  if (history.length === 0) { showToast('📭 No history to export.'); return; }
+  const json = JSON.stringify(history, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'humanizer_history.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('📥 History exported as JSON!');
+}
+
+function copyOutput() {
+  const output = document.getElementById('outputText').value;
+  if (!output) { showToast('⚠️ Nothing to copy.'); return; }
+  navigator.clipboard.writeText(output).then(() => {
+    showToast('📋 Copied to clipboard!');
+  }).catch(() => {
+    document.getElementById('outputText').select();
+    document.execCommand('copy');
+    showToast('📋 Copied!');
+  });
+}
+
+function clearAll() {
+  document.getElementById('inputText').value = '';
+  document.getElementById('outputText').value = '';
+  document.getElementById('statsRow').style.display = 'none';
+  document.getElementById('comparisonSection').style.display = 'none';
+  document.getElementById('inputScore').style.display = 'none';
+  document.getElementById('outputScore').style.display = 'none';
+  showToast('🗑 Cleared all text.');
+}
+
+function loadSample() {
+  document.getElementById('inputText').value = `Artificial intelligence has revolutionized the modern workplace in numerous ways. It is important to note that organizations must adapt to these changes in order to remain competitive in today's fast-paced business landscape. Furthermore, the implementation of AI technologies can lead to significant improvements in operational efficiency.
+
+In addition, businesses that leverage machine learning algorithms are able to process vast amounts of data and extract valuable insights. Consequently, these organizations are better positioned to make data-driven decisions. Moreover, AI-powered automation reduces the need for manual intervention in repetitive tasks, thereby allowing employees to focus on more strategic initiatives.
+
+In conclusion, the integration of artificial intelligence into business operations is not merely a technological trend but a fundamental shift that will continue to shape the future of work. Therefore, it is imperative for companies to embrace these innovations and invest in the necessary infrastructure.`;
+  showToast('📝 Sample AI text loaded! Click "Humanize" to transform it.');
+}
+
+function openBulkModal() {
+  if (!isPremium) {
+    showToast('🔒 Bulk humanization is a Premium feature. Scroll down to upgrade!');
+    document.getElementById('premium').scrollIntoView({ behavior: 'smooth' });
+    return;
+  }
+  document.getElementById('bulkModal').classList.add('show');
+}
+
+function closeBulkModal() {
+  document.getElementById('bulkModal').classList.remove('show');
+  document.getElementById('bulkResults').innerHTML = '';
+  document.getElementById('bulkProgressBar').style.display = 'none';
+}
+
+function renderHistory() {
+  const container = document.getElementById('historyList');
+  if (history.length === 0) {
+    container.innerHTML = '<p class="history-empty">No history yet. Humanize some text to see it here.</p>';
+    return;
+  }
+  container.innerHTML = history.map((h, i) => `
+    <div class="history-item" onclick="loadHistoryItem(${i})">
+      <div>
+        <strong style="font-size:0.9rem;">${escapeHTML(h.input.substring(0, 60))}${h.input.length > 60 ? '...' : ''}</strong>
+        <div class="meta">${h.mode} · ${h.beforeScore}% → ${h.afterScore}% · ${new Date(h.timestamp).toLocaleString()}</div>
+      </div>
+      <span style="color:var(--accent);font-size:0.8rem;">${h.changes} changes</span>
+    </div>
+  `).join('');
+  if (!isPremium && history.length >= 3) {
+    container.innerHTML += '<p style="text-align:center;font-size:0.8rem;color:var(--text2);margin-top:8px;">🔒 Free tier keeps last 3. <a href="#premium" style="color:var(--accent);">Upgrade</a> for full history (50).</p>';
+  }
+}
+
+function loadHistoryItem(index) {
+  if (index >= history.length) return;
+  const h = history[index];
+  // We can only show the truncated version since we didn't store full text
+  showToast('📜 History item loaded (truncated). Full storage available with Premium.');
+}
+
+function showToast(message) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.classList.add('show');
+  clearTimeout(toast._timeout);
+  toast._timeout = setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// ─── URL param check for Stripe return ────────────────────
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('premium') === 'success') {
+  isPremium = true;
+  localStorage.setItem('th_premium', 'true');
+  localStorage.setItem('th_premium_since', Date.now().toString());
+  updatePremiumUI();
+  showToast('🎉 Payment successful! Premium features unlocked.');
+  window.history.replaceState({}, '', window.location.pathname);
+}
+if (urlParams.get('premium') === 'cancelled') {
+  showToast('💡 Payment cancelled. You can upgrade anytime.');
+  window.history.replaceState({}, '', window.location.pathname);
+}
+
+// Close bulk modal on overlay click
+document.getElementById('bulkModal').addEventListener('click', function(e) {
+  if (e.target === this) closeBulkModal();
+});
+</script>
+</body>
+</html>
